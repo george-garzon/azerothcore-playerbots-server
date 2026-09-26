@@ -9,6 +9,11 @@ stop the native Ollama process.
 
 ## Start and stop
 
+Recommended: double-click `Start Server.cmd` / `Stop Server.cmd`, or use the
+[control dashboard](dashboard-controls.md). They manage native Ollama alongside
+Docker and warn players before stopping. The direct Docker commands below bypass
+that countdown and do not manage native Ollama.
+
 ```powershell
 # Start or apply Compose/.env changes without rebuilding images
 docker compose up -d
@@ -128,8 +133,9 @@ realm requires checking world-server logs, not manually clearing its offline fla
 
 ## Dashboard and troubleshooting
 
-Open <http://127.0.0.1:3000> on the Docker host. The dashboard is read-only and
-cannot start or stop containers.
+Open <http://127.0.0.1:3000> on the Docker host for embedded controls and character
+statistics, or <http://127.0.0.1:8765> for controls that remain available while
+Docker is stopped. See [dashboard controls](dashboard-controls.md).
 
 - **Realm offline:** check `docker compose ps -a` and world-server logs. Initial
   database import and bot creation can take time.

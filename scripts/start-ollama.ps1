@@ -49,7 +49,10 @@ if (-not $Ready) {
     Write-Host "Using the existing Ollama listener; its process settings are unchanged."
 }
 
-& $Executable pull $Model
-if ($LASTEXITCODE -ne 0) { throw "Could not download model $Model." }
+$InstalledModels = (Invoke-RestMethod http://127.0.0.1:11434/api/tags -TimeoutSec 5).models
+if (-not ($InstalledModels | Where-Object { $_.name -eq $Model -or $_.name -eq "${Model}:latest" })) {
+    & $Executable pull $Model
+    if ($LASTEXITCODE -ne 0) { throw "Could not download model $Model." }
+}
 Write-Host "Ollama ready at http://127.0.0.1:11434 (Docker: host.docker.internal:11434)."
 Write-Host "Check GPU after a reply: & '$Executable' ps"

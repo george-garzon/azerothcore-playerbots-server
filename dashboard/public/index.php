@@ -193,7 +193,6 @@ $refresh = max(5, (int) env_value('DASHBOARD_REFRESH_SECONDS', '15'));
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta http-equiv="refresh" content="<?= htmlspecialchars((string) $refresh, ENT_QUOTES) ?>">
     <title><?= htmlspecialchars(env_value('DASHBOARD_TITLE', 'AzerothCore Local Observer'), ENT_QUOTES) ?></title>
     <style>
         :root { color-scheme: dark; --bg: #0d1117; --panel: #151b23; --muted: #8b949e; --text: #e6edf3; --accent: #f0b35b; --ok: #3fb950; --bad: #f85149; --line: #30363d; }
@@ -235,11 +234,13 @@ $refresh = max(5, (int) env_value('DASHBOARD_REFRESH_SECONDS', '15'));
     <header>
         <div>
             <h1><?= htmlspecialchars(env_value('DASHBOARD_TITLE', 'AzerothCore Local Observer'), ENT_QUOTES) ?></h1>
-            <div class="muted">Read-only localhost dashboard for accounts, characters, bots, AH, modules, and server ports.</div>
+            <div class="muted">Local controls, live monitoring, and character statistics.</div>
         </div>
-        <div class="pill">Auto-refresh: <?= $refresh ?>s · <a href="?format=json">JSON</a></div>
+        <div class="pill"><a href="http://127.0.0.1:8765/">Standalone controls</a> · <a href="?format=json">JSON snapshot</a></div>
     </header>
 
+    <iframe src="control.html" title="Live server controls" style="width:100%;height:1720px;border:0;border-radius:18px;margin-bottom:24px"></iframe>
+    <p class="muted">Character statistics below are a page-load snapshot. Refresh this page to update them.</p>
     <?php if ($errors !== []): ?>
         <section class="full errors" style="margin-bottom: 16px">
             <h2>Database connection warnings</h2>

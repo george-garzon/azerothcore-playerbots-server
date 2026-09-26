@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AzerothCore Control Room</title><link rel="stylesheet" href="control.css"></head>
+<body><main>
+<header><div><small>LOCAL SERVER MANAGEMENT</small><h1>AzerothCore Control Room</h1></div><a href="http://127.0.0.1:3000/" target="_top">Character dashboard ↗</a></header>
+<p class="muted">Controls remain available at <a href="http://127.0.0.1:8765/" target="_top">127.0.0.1:8765</a> when Docker is stopped.</p>
+<div id="notice" role="status" aria-live="polite">Connecting to local controller…</div>
+<div class="metrics">
+<article><small>REALM</small><strong id="realm">Unknown</strong><span id="address">Waiting for sample</span></article>
+<article><small>POPULATION</small><strong id="population">—</strong><span>Online characters · classified bots</span></article>
+<article><small>OLLAMA / GPU</small><strong id="gpu">—</strong><span id="vram">Waiting for sample</span></article>
+<article><small>RESPONSE TIME</small><strong id="latency">Not measured</strong><span id="api-latency">Run a test reply below</span></article>
+</div>
+<section><h2>Power controls</h2><div class="buttons">
+<button data-action="start_all">Start game + Ollama</button><button data-action="start_world">Start world</button>
+<button class="danger" data-action="stop_world">Stop world</button><button class="danger" data-action="stop_all">Stop game + Ollama</button>
+<label>Shutdown warning <input id="countdown" type="number" min="10" max="300" value="60"> seconds</label>
+</div><p class="muted">Stopping sends in-game countdown warnings, then saves and stops the server. Accounts and characters are retained.</p>
+<div id="job" role="status" aria-live="polite">No operation running.</div><div id="services" class="muted"></div></section>
+<section><h2>XP and bot population</h2><form id="settings">
+<div class="fields">
+<label>Kill XP multiplier<input name="XP_RATE_KILL" type="number" min="0.1" max="100" step="0.1" required></label>
+<label>Quest XP multiplier<input name="XP_RATE_QUEST" type="number" min="0.1" max="100" step="0.1" required></label>
+<label>Dungeon Finder quest XP<input name="XP_RATE_QUEST_DF" type="number" min="0.1" max="100" step="0.1" required></label>
+<label>Minimum random bots<input name="BOT_MIN" type="number" min="0" max="5000" required></label>
+<label>Maximum random bots<input name="BOT_MAX" type="number" min="0" max="5000" required></label>
+<label>Chat messages / minute<input name="OLLAMA_CHAT_RATE_LIMIT_GLOBAL_PER_MINUTE" type="number" min="1" max="120" required></label>
+<label>AI chat<select name="OLLAMA_CHAT_ENABLE"><option value="1">Enabled</option><option value="0">Disabled</option></select></label>
+<label>Ambient chatter<select name="OLLAMA_CHAT_RANDOM_CHATTER"><option value="1">Enabled</option><option value="0">Disabled</option></select></label>
+<label>Chat during combat<select name="OLLAMA_CHAT_DISABLE_IN_COMBAT"><option value="0">Allowed</option><option value="1">Paused</option></select></label>
+</div><div class="buttons"><button type="submit" value="save_settings">Save for next start</button><button type="submit" value="apply_settings">Save + restart world</button><button type="button" data-action="reload_chat">Reload saved chat settings</button><button type="button" data-action="probe">Test Ollama reply</button></div>
+<p class="muted">Saving writes .env and generated configuration. XP/bot changes need a world restart. Chat reload applies saved settings without disconnecting players.</p>
+</form></section>
+<section><div class="section-head"><h2>Live logs</h2><select id="log-source" aria-label="Log source"><option>ac-worldserver</option><option>ac-authserver</option><option>ac-database</option><option value="ollama">Native Ollama</option></select><label><input id="pause-logs" type="checkbox"> Pause</label></div>
+<p class="muted">Latest 100 lines; updates every 5 seconds. Pause to inspect without scrolling.</p><pre id="logs" tabindex="0">Loading…</pre></section>
+<section><h2>Errors and operation history</h2><pre id="errors">Collecting status…</pre><div id="events"></div><p id="updated" class="muted"></p></section>
+</main><script src="control.js"></script></body></html>

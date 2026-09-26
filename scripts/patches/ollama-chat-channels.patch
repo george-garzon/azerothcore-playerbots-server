@@ -1,0 +1,79 @@
+diff --git a/src/mod-ollama-chat_dispatch.cpp b/src/mod-ollama-chat_dispatch.cpp
+index f1364df..4604556 100644
+--- a/src/mod-ollama-chat_dispatch.cpp
++++ b/src/mod-ollama-chat_dispatch.cpp
+@@ -13,6 +13,7 @@
+ #include "CellImpl.h"
+ #include "Channel.h"
+ #include "ChannelMgr.h"
++#include "Chat.h"
+ #include "GridNotifiers.h"
+ #include "GridNotifiersImpl.h"
+ #include "Group.h"
+@@ -294,6 +295,14 @@ namespace
+                     return false;
+                 if (!OllamaGroupHasRealPlayer(bot))
+                     return false;
++                if (bot->GetGroup()->isBGGroup())
++                {
++                    WorldPacket packet;
++                    ChatHandler::BuildChatPacket(packet, CHAT_MSG_BATTLEGROUND, LANG_UNIVERSAL,
++                        bot->GetGUID(), {}, c.text, CHAT_TAG_NONE, bot->GetName());
++                    bot->GetGroup()->BroadcastPacket(&packet, false);
++                    return true;
++                }
+                 return botAI->SayToParty(c.text);
+ 
+             case SRC_RAID_LOCAL:
+@@ -301,6 +310,14 @@ namespace
+                     return false;
+                 if (!OllamaGroupHasRealPlayer(bot))
+                     return false;
++                if (bot->GetGroup()->isBGGroup())
++                {
++                    WorldPacket packet;
++                    ChatHandler::BuildChatPacket(packet, CHAT_MSG_BATTLEGROUND, LANG_UNIVERSAL,
++                        bot->GetGUID(), {}, c.text, CHAT_TAG_NONE, bot->GetName());
++                    bot->GetGroup()->BroadcastPacket(&packet, false);
++                    return true;
++                }
+                 return botAI->SayToRaid(c.text);
+ 
+             case SRC_YELL_LOCAL:
+diff --git a/src/mod-ollama-chat_handler.cpp b/src/mod-ollama-chat_handler.cpp
+index 264d845..520935c 100644
+--- a/src/mod-ollama-chat_handler.cpp
++++ b/src/mod-ollama-chat_handler.cpp
+@@ -247,7 +247,9 @@ ChatChannelSourceLocal GetChannelSourceLocal(uint32_t type)
+         case CHAT_MSG_PARTY:
+         case CHAT_MSG_PARTY_LEADER:
+             return SRC_PARTY_LOCAL;
+-        case CHAT_MSG_RAID:
++        case CHAT_MSG_RAID:
++        case CHAT_MSG_BATTLEGROUND:
++        case CHAT_MSG_BATTLEGROUND_LEADER:
+         case CHAT_MSG_RAID_LEADER:
+         case CHAT_MSG_RAID_WARNING:
+             return SRC_RAID_LOCAL;
+diff --git a/src/mod-ollama-chat_random.cpp b/src/mod-ollama-chat_random.cpp
+index 710070b..9d4d13f 100644
+--- a/src/mod-ollama-chat_random.cpp
++++ b/src/mod-ollama-chat_random.cpp
+@@ -119,7 +119,16 @@ namespace
+             addChannel(ChatChannelId::GUILD_RECRUITMENT, g_ChatterUseGuildRecruitmentChannel);
+         }
+ 
+-        if (options.empty())
++        // World is shared across zones; only use an existing membership.
++        if (!g_DisableForCustomChannels)
++        {
++            ChannelMgr* manager = ChannelMgr::forTeam(bot->GetTeamId());
++            Channel* channel = manager ? manager->GetChannel("World", bot) : nullptr;
++            if (channel && bot->IsInChannel(channel) && world.RealPlayerInChannel(channel))
++                options.push_back({ SRC_GENERAL_LOCAL, channel->GetName(), channel->GetChannelId() });
++        }
++
++        if (options.empty())
+             return false;
+ 
+         const Option& chosen = options[PickIndex(options.size())];

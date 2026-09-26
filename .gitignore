@@ -8,3 +8,4 @@ env/
 generated/
 var/
 *.log
+__pycache__/

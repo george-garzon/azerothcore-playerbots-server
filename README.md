@@ -6,6 +6,10 @@ The important bit: `mod-playerbots` requires the `mod-playerbots/azerothcore-wot
 
 ## Quick Start
 
+For normal operation, double-click **Start Server.cmd** or **Stop Server.cmd**.
+The [control dashboard](docs/dashboard-controls.md) at <http://127.0.0.1:8765/>
+manages the world server, native Ollama, settings, shutdown warnings and live logs.
+
 See [server operations](docs/operations.md) for start/stop, networking and XP
 settings, and [module guide](docs/modules.md) for operating the installed plugins.
 
