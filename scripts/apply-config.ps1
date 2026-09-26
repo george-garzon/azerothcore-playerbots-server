@@ -198,9 +198,10 @@ Set-Content -LiteralPath (Join-Path $ModuleConfigPath "mod_moneyforkills.conf") 
 Set-Content -LiteralPath (Join-Path $ModuleConfigPath "mod_ollama_chat.conf") -Value $ollamaConfig -Encoding ascii
 
 $AccountSqlGenerator = Join-Path $PSScriptRoot "generate-accounts-sql.py"
-$PythonCommand = Get-Command python -ErrorAction SilentlyContinue
+# Prefer the Windows launcher over a possible Microsoft Store python shortcut.
+$PythonCommand = Get-Command py -ErrorAction SilentlyContinue
 if (-not $PythonCommand) {
-    $PythonCommand = Get-Command py -ErrorAction SilentlyContinue
+    $PythonCommand = Get-Command python -ErrorAction SilentlyContinue
 }
 
 if (-not $PythonCommand) {

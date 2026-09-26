@@ -12,5 +12,6 @@ if (-not (Test-Path -LiteralPath (Join-Path $CorePath ".git"))) {
 }
 
 Set-Location $RepoRoot
+& (Join-Path $PSScriptRoot "apply-module-compat.ps1") -CoreDir $CoreDir
 & (Join-Path $PSScriptRoot "apply-config.ps1") -CoreDir $CoreDir
 docker compose up -d --build

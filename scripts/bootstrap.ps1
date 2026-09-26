@@ -151,6 +151,7 @@ if (-not (Test-Path -LiteralPath $EnvPath)) {
     }
 }
 
+& (Join-Path $PSScriptRoot "apply-module-compat.ps1") -CoreDir $CoreDir
 & (Join-Path $PSScriptRoot "apply-config.ps1") -CoreDir $CoreDir
 
 Write-Host "AzerothCore Playerbot fork and modules are ready in $CorePath"

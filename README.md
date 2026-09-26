@@ -139,6 +139,15 @@ Start or rebuild:
 .\scripts\start.ps1
 ```
 
+Startup and bootstrap apply the DungeonRespawn player-hook compatibility fix for
+the current Playerbot core. If building directly with Compose after fetching
+modules manually, apply it first:
+
+```powershell
+.\scripts\apply-module-compat.ps1
+docker compose up -d --build
+```
+
 After changing bot/module settings in `.env`, run:
 
 ```powershell
