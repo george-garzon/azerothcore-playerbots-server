@@ -5,6 +5,25 @@ param(
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $CorePath = Join-Path $RepoRoot $CoreDir
+$OllamaPath = Join-Path $CorePath "modules/mod-ollama-chat"
+$OllamaPatch = Join-Path $PSScriptRoot "patches/ollama-chat-channels.patch"
+if (Test-Path -LiteralPath $OllamaPath) {
+    # A failed reverse check means the patch has not been applied yet.
+    $SavedErrorPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        git -C $OllamaPath apply --reverse --check $OllamaPatch 2>$null
+    } finally {
+        $ErrorActionPreference = $SavedErrorPreference
+    }
+    if ($LASTEXITCODE -ne 0) {
+        git -C $OllamaPath apply --check $OllamaPatch
+        if ($LASTEXITCODE -ne 0) { throw "Ollama channel patch needs review against the updated module." }
+        git -C $OllamaPath apply $OllamaPatch
+        if ($LASTEXITCODE -ne 0) { throw "Failed to apply Ollama channel patch." }
+        Write-Host "Applied Ollama World and battleground chat routing."
+    }
+}
 $ModulePath = Join-Path $CorePath "modules/DungeonRespawn/src"
 $PlayerScriptPath = Join-Path $CorePath "src/server/game/Scripting/ScriptDefines/PlayerScript.h"
 

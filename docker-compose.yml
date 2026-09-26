@@ -109,6 +109,9 @@ services:
       AC_PLAYERBOTS_DATABASE_INFO: ac-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};acore_playerbots
 
       AC_AI_PLAYERBOT_ENABLED: "1"
+      AC_RATE_XP_KILL: ${XP_RATE_KILL:-3}
+      AC_RATE_XP_QUEST: ${XP_RATE_QUEST:-3}
+      AC_RATE_XP_QUEST_DF: ${XP_RATE_QUEST_DF:-3}
       AC_AI_PLAYERBOT_RANDOM_BOT_AUTOLOGIN: "1"
       AC_AI_PLAYERBOT_MIN_RANDOM_BOTS: ${BOT_MIN:-1500}
       AC_AI_PLAYERBOT_MAX_RANDOM_BOTS: ${BOT_MAX:-1500}
@@ -261,7 +264,7 @@ services:
     networks:
       - ac-network
     ports:
-      - ${OLLAMA_EXTERNAL_PORT:-11434}:11434
+      - 127.0.0.1:${OLLAMA_EXTERNAL_PORT:-11434}:11434
     volumes:
       - ollama:/root/.ollama
     profiles:

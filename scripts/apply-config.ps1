@@ -105,6 +105,18 @@ AuctionHouseBot.Buyer.BuyCandidatesPerBuyCycle = $(Get-Setting -Name "AHBOT_BUY_
 AuctionHouseBot.Buyer.AcceptablePriceModifier = $(Get-Setting -Name "AHBOT_ACCEPTABLE_PRICE_MODIFIER" -Fallback "1")
 "@
 
+if ((Get-Setting "OLLAMA_CHAT_ENABLE" "0") -eq "1") {
+    $playerbotsConfig += @"
+
+AiPlayerbot.EnableBroadcasts = 0
+AiPlayerbot.RandomBotTalk = 0
+AiPlayerbot.RandomBotEmote = 0
+AiPlayerbot.RandomBotSuggestDungeons = 0
+AiPlayerbot.EnableGreet = 0
+AiPlayerbot.GuildFeedback = 0
+AiPlayerbot.RandomBotSayWithoutMaster = 0
+"@
+}
 Set-Content -LiteralPath (Join-Path $ModuleConfigPath "playerbots.conf") -Value $playerbotsConfig -Encoding ascii
 Set-Content -LiteralPath (Join-Path $ModuleConfigPath "mod_ahbot.conf") -Value $ahbotConfig -Encoding ascii
 
@@ -179,15 +191,53 @@ MFK.Killer.Level.Diff.Enable = $(Get-Setting -Name "MFK_KILLER_LEVEL_DIFF_ENABLE
 MFK.Max.Gold.Threshold = $(Get-Setting -Name "MFK_MAX_GOLD_THRESHOLD" -Fallback "0.5")
 "@
 
-$ollamaConfig = @"
-[worldserver]
-OllamaChat.Enable = $(Get-Setting -Name "OLLAMA_CHAT_ENABLE" -Fallback "0")
-OllamaChat.Url = $(Get-Setting -Name "OLLAMA_CHAT_URL" -Fallback "http://ollama:11434/api/generate")
-OllamaChat.Model = $(Get-Setting -Name "OLLAMA_CHAT_MODEL" -Fallback "llama3.2:1b")
-OllamaChat.RateLimit.GlobalPerMinute = $(Get-Setting -Name "OLLAMA_CHAT_RATE_LIMIT_GLOBAL_PER_MINUTE" -Fallback "20")
-OllamaChat.DisableRepliesInCombat = 1
-OllamaChat.EnableWhisperReplies = 1
-"@
+# Keep upstream prompt templates and command filters, then override our settings.
+$ollamaTemplate = Join-Path $CorePath "modules/mod-ollama-chat/conf/mod_ollama_chat.conf.dist"
+$ollamaConfig = [System.IO.File]::ReadAllText($ollamaTemplate)
+$ollamaSettings = @{
+    "Enable" = Get-Setting "OLLAMA_CHAT_ENABLE" "0"
+    "Url" = Get-Setting "OLLAMA_CHAT_URL" "http://host.docker.internal:11434/api/generate"
+    "Model" = Get-Setting "OLLAMA_CHAT_MODEL" "llama3.2:3b"
+    "RateLimit.GlobalPerMinute" = Get-Setting "OLLAMA_CHAT_RATE_LIMIT_GLOBAL_PER_MINUTE" "20"
+    "RateLimit.ScopePerMinute" = "6"
+    "MaxConcurrentQueries" = "1"
+    "WorkerThreads" = "1"
+    "MaxQueueDepth" = "8"
+    "HttpTimeoutSeconds" = "45"
+    "NumCtx" = "4096"
+    "NumPredict" = "80"
+    "ThinkMode" = '"off"'
+    "ThinkModeEnableForModule" = "0"
+    "DisableForCustomChannels" = "0"
+    "DisableForParty" = "0"
+    "DisableRepliesInCombat" = Get-Setting "OLLAMA_CHAT_DISABLE_IN_COMBAT" "0"
+    "EnableWhisperReplies" = "1"
+    "EnableRandomChatter" = Get-Setting "OLLAMA_CHAT_RANDOM_CHATTER" "1"
+    "EnableEventChatter" = "1"
+    "Chatter.UseGeneralChannel" = "1"
+    "Chatter.UseTradeChannel" = "1"
+    "PlayerReplyChance.Channel" = "80"
+    "PlayerReplyChance.Party" = "100"
+    "MaxBotsToPick" = "1"
+    "BotReplyChance.Channel" = "3"
+    "BotReplyChance.Party" = "10"
+    "BotConversation.MaxChainDepth" = "2"
+    "BotConversation.RequireRecentHuman" = "1"
+    "RandomChatterMaxBotsPerPlayer" = "1"
+    "EventChatterMaxBotsPerPlayer" = "1"
+    "MinRandomInterval" = "90"
+    "MaxRandomInterval" = "240"
+    "Cooldown.PerBotSeconds" = "45"
+    "Cooldown.PerScopeSeconds" = "15"
+}
+foreach ($key in $ollamaSettings.Keys) {
+    $pattern = '(?m)^OllamaChat\.' + [regex]::Escape($key) + '\s*=.*$'
+    if (-not [regex]::IsMatch($ollamaConfig, $pattern)) {
+        throw "Ollama config option no longer exists upstream: $key"
+    }
+    $replacement = "OllamaChat.$key = $($ollamaSettings[$key])"
+    $ollamaConfig = [regex]::Replace($ollamaConfig, $pattern, [System.Text.RegularExpressions.MatchEvaluator]{ param($match) $replacement })
+}
 
 Set-Content -LiteralPath (Join-Path $ModuleConfigPath "mod_dungeon_clear.conf") -Value $dungeonClearConfig -Encoding ascii
 Set-Content -LiteralPath (Join-Path $ModuleConfigPath "AutoBalance.conf") -Value $autoBalanceConfig -Encoding ascii
@@ -195,7 +245,7 @@ Set-Content -LiteralPath (Join-Path $ModuleConfigPath "mod_aoe_loot.conf") -Valu
 Set-Content -LiteralPath (Join-Path $ModuleConfigPath "dungeonrespawn.conf") -Value $dungeonRespawnConfig -Encoding ascii
 Set-Content -LiteralPath (Join-Path $ModuleConfigPath "npc_allmounts.conf") -Value $npcAllMountsConfig -Encoding ascii
 Set-Content -LiteralPath (Join-Path $ModuleConfigPath "mod_moneyforkills.conf") -Value $moneyForKillsConfig -Encoding ascii
-Set-Content -LiteralPath (Join-Path $ModuleConfigPath "mod_ollama_chat.conf") -Value $ollamaConfig -Encoding ascii
+[IO.File]::WriteAllText((Join-Path $ModuleConfigPath "mod_ollama_chat.conf"), $ollamaConfig, (New-Object Text.UTF8Encoding($false)))
 
 $AccountSqlGenerator = Join-Path $PSScriptRoot "generate-accounts-sql.py"
 # Prefer the Windows launcher over a possible Microsoft Store python shortcut.

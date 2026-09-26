@@ -6,6 +6,11 @@ The important bit: `mod-playerbots` requires the `mod-playerbots/azerothcore-wot
 
 ## Quick Start
 
+See [server operations](docs/operations.md) for start/stop, networking and XP
+settings, and [module guide](docs/modules.md) for operating the installed plugins.
+
+Kill and quest XP default to **3x**, including Dungeon Finder quest rewards.
+
 ```powershell
 Copy-Item .env.example .env
 notepad .env
@@ -197,17 +202,12 @@ docker compose restart ac-worldserver
 
 ## Ollama Chat
 
-`mod-ollama-chat` is cloned and configured off by default so normal gameplay does not require a local LLM. To try it:
-
-```dotenv
-OLLAMA_CHAT_ENABLE=1
-OLLAMA_CHAT_MODEL=llama3.2:1b
-```
-
-Then run the optional Ollama service and rebuild/restart:
+Bot conversation uses native Windows Ollama on the RX 9060 XT through Vulkan,
+with `llama3.2:3b`. See the [GPU chat guide](docs/ollama.md) for installation,
+World/Trade/dungeon/BG chat, rate limits, GPU checks and stopping Ollama.
 
 ```powershell
-docker compose --profile llm up -d ollama
+.\scripts\start-ollama.ps1
 .\scripts\apply-config.ps1
-docker compose restart ac-worldserver
+docker compose up -d
 ```
