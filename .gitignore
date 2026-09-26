@@ -1,0 +1,10 @@
+.env
+.idea/
+.tmp-probe/
+.tmp-dungeon-clear/
+.tmp-dungeonrespawn-inspect/
+azerothcore-wotlk/
+env/
+generated/
+var/
+*.log

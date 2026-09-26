@@ -1,0 +1,275 @@
+name: ${COMPOSE_PROJECT_NAME:-azerothcore-playerbots}
+
+services:
+  ac-database:
+    container_name: ac-database
+    image: mysql:8.4
+    networks:
+      - ac-network
+    ports:
+      - ${DOCKER_DB_EXTERNAL_PORT:-63306}:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DOCKER_DB_ROOT_PASSWORD:-password}
+    volumes:
+      - ${DOCKER_VOL_DB:-ac-database}:/var/lib/mysql
+    restart: unless-stopped
+    healthcheck:
+      test: "/usr/bin/mysql --user=root --password=$$MYSQL_ROOT_PASSWORD --execute \"SHOW DATABASES;\""
+      interval: 5s
+      timeout: 10s
+      retries: 40
+
+  ac-playerbots-db-init:
+    container_name: ac-playerbots-db-init
+    image: mysql:8.4
+    networks:
+      - ac-network
+    depends_on:
+      ac-database:
+        condition: service_healthy
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DOCKER_DB_ROOT_PASSWORD:-password}
+    command: >
+      sh -ec 'mysql --host=ac-database --user=root --password="$$MYSQL_ROOT_PASSWORD"
+      --execute="CREATE DATABASE IF NOT EXISTS acore_playerbots DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"'
+    restart: "no"
+
+  ac-db-import:
+    container_name: ac-db-import
+    image: acore/ac-wotlk-db-import:${DOCKER_IMAGE_TAG:-playerbot-local}
+    networks:
+      - ac-network
+    build:
+      context: ${ACORE_DIR:-./azerothcore-wotlk}
+      target: db-import
+      dockerfile: apps/docker/Dockerfile
+      args:
+        USER_ID: ${DOCKER_USER_ID:-1000}
+        GROUP_ID: ${DOCKER_GROUP_ID:-1000}
+        DOCKER_USER: ${DOCKER_USER:-acore}
+    environment:
+      AC_DATA_DIR: /azerothcore/env/dist/data
+      AC_LOGS_DIR: /azerothcore/env/dist/logs
+      AC_LOGIN_DATABASE_INFO: ac-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};acore_auth
+      AC_WORLD_DATABASE_INFO: ac-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};acore_world
+      AC_CHARACTER_DATABASE_INFO: ac-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};acore_characters
+      AC_PLAYERBOTS_DATABASE_INFO: ac-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};acore_playerbots
+    volumes:
+      - ${DOCKER_VOL_ETC:-./azerothcore-wotlk/env/dist/etc}:/azerothcore/env/dist/etc
+      - ${DOCKER_VOL_LOGS:-./azerothcore-wotlk/env/dist/logs}:/azerothcore/env/dist/logs:delegated
+    depends_on:
+      ac-database:
+        condition: service_healthy
+      ac-playerbots-db-init:
+        condition: service_completed_successfully
+
+  ac-seed-accounts:
+    container_name: ac-seed-accounts
+    image: mysql:8.4
+    networks:
+      - ac-network
+    depends_on:
+      ac-database:
+        condition: service_healthy
+      ac-db-import:
+        condition: service_completed_successfully
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DOCKER_DB_ROOT_PASSWORD:-password}
+    volumes:
+      - ./generated/sql/init_accounts.sql:/init/init_accounts.sql:ro
+    command: >
+      sh -ec 'mysql --host=ac-database --user=root --password="$$MYSQL_ROOT_PASSWORD"
+      acore_auth < /init/init_accounts.sql'
+    restart: "no"
+
+  ac-worldserver:
+    container_name: ac-worldserver
+    image: acore/ac-wotlk-worldserver:${DOCKER_IMAGE_TAG:-playerbot-local}
+    build:
+      context: ${ACORE_DIR:-./azerothcore-wotlk}
+      target: worldserver
+      dockerfile: apps/docker/Dockerfile
+      args:
+        USER_ID: ${DOCKER_USER_ID:-1000}
+        GROUP_ID: ${DOCKER_GROUP_ID:-1000}
+        DOCKER_USER: ${DOCKER_USER:-acore}
+    networks:
+      - ac-network
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    env_file:
+      - ${DOCKER_AC_ENV_FILE:-./azerothcore-wotlk/conf/dist/env.ac}
+    environment:
+      AC_DATA_DIR: /azerothcore/env/dist/data
+      AC_LOGS_DIR: /azerothcore/env/dist/logs
+      AC_LOGIN_DATABASE_INFO: ac-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};acore_auth
+      AC_WORLD_DATABASE_INFO: ac-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};acore_world
+      AC_CHARACTER_DATABASE_INFO: ac-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};acore_characters
+      AC_PLAYERBOTS_DATABASE_INFO: ac-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};acore_playerbots
+
+      AC_AI_PLAYERBOT_ENABLED: "1"
+      AC_AI_PLAYERBOT_RANDOM_BOT_AUTOLOGIN: "1"
+      AC_AI_PLAYERBOT_MIN_RANDOM_BOTS: ${BOT_MIN:-1500}
+      AC_AI_PLAYERBOT_MAX_RANDOM_BOTS: ${BOT_MAX:-1500}
+      AC_AI_PLAYERBOT_RANDOM_BOT_ACCOUNT_COUNT: ${BOT_ACCOUNT_COUNT:-0}
+      AC_AI_PLAYERBOT_ADD_CLASS_ACCOUNT_POOL_SIZE: ${ADDCLASS_ACCOUNT_POOL_SIZE:-50}
+      AC_AI_PLAYERBOT_MAX_ADDED_BOTS: ${MAX_ADDED_BOTS:-40}
+      AC_AI_PLAYERBOT_GROUP_INVITATION_PERMISSION: ${GROUP_INVITATION_PERMISSION:-2}
+      AC_AI_PLAYERBOT_APPLY_INSTANCE_STRATEGIES: ${APPLY_INSTANCE_STRATEGIES:-1}
+      AC_AI_PLAYERBOT_SUMMON_WHEN_GROUP: ${SUMMON_WHEN_GROUP:-1}
+      AC_AI_PLAYERBOT_AUTO_AVOID_AOE: ${AUTO_AVOID_AOE:-1}
+      AC_AI_PLAYERBOT_AUTO_PARTY_BUFFS: ${AUTO_PARTY_BUFFS:-2}
+      AC_AI_PLAYERBOT_SYNC_QUEST_WITH_PLAYER: ${SYNC_QUEST_WITH_PLAYER:-1}
+
+      AC_AUCTION_HOUSE_BOT_GUIDS: ${AHBOT_GUIDS:-0}
+      AC_AUCTION_HOUSE_BOT_ENABLE_SELLER: ${AHBOT_ENABLE_SELLER:-1}
+      AC_AUCTION_HOUSE_BOT_BUYER_ENABLED: ${AHBOT_ENABLE_BUYER:-1}
+      AC_AUCTION_HOUSE_BOT_ITEMS_PER_CYCLE: ${AHBOT_ITEMS_PER_CYCLE:-400}
+    ports:
+      - ${DOCKER_WORLD_EXTERNAL_PORT:-8085}:8085
+      - ${DOCKER_SOAP_EXTERNAL_PORT:-7878}:7878
+    volumes:
+      - ${DOCKER_VOL_ETC:-./azerothcore-wotlk/env/dist/etc}:/azerothcore/env/dist/etc
+      - ${DOCKER_VOL_LOGS:-./azerothcore-wotlk/env/dist/logs}:/azerothcore/env/dist/logs:delegated
+      - ${DOCKER_VOL_DATA:-ac-client-data}:/azerothcore/env/dist/data/:ro
+      - ./scripts/lua:/azerothcore/env/dist/bin/lua_scripts/scripts
+    depends_on:
+      ac-database:
+        condition: service_healthy
+      ac-playerbots-db-init:
+        condition: service_completed_successfully
+      ac-db-import:
+        condition: service_completed_successfully
+      ac-seed-accounts:
+        condition: service_completed_successfully
+      ac-client-data-init:
+        condition: service_completed_successfully
+
+  ac-authserver:
+    container_name: ac-authserver
+    image: acore/ac-wotlk-authserver:${DOCKER_IMAGE_TAG:-playerbot-local}
+    build:
+      context: ${ACORE_DIR:-./azerothcore-wotlk}
+      target: authserver
+      dockerfile: apps/docker/Dockerfile
+      args:
+        USER_ID: ${DOCKER_USER_ID:-1000}
+        GROUP_ID: ${DOCKER_GROUP_ID:-1000}
+        DOCKER_USER: ${DOCKER_USER:-acore}
+    networks:
+      - ac-network
+    tty: true
+    restart: unless-stopped
+    env_file:
+      - ${DOCKER_AC_ENV_FILE:-./azerothcore-wotlk/conf/dist/env.ac}
+    environment:
+      AC_LOGS_DIR: /azerothcore/env/dist/logs
+      AC_TEMP_DIR: /azerothcore/env/dist/temp
+      AC_LOGIN_DATABASE_INFO: ac-database;3306;root;${DOCKER_DB_ROOT_PASSWORD:-password};acore_auth
+    volumes:
+      - ${DOCKER_VOL_ETC:-./azerothcore-wotlk/env/dist/etc}:/azerothcore/env/dist/etc
+      - ${DOCKER_VOL_LOGS:-./azerothcore-wotlk/env/dist/logs}:/azerothcore/env/dist/logs:delegated
+    ports:
+      - ${DOCKER_AUTH_EXTERNAL_PORT:-3724}:3724
+    depends_on:
+      ac-database:
+        condition: service_healthy
+      ac-db-import:
+        condition: service_completed_successfully
+      ac-seed-accounts:
+        condition: service_completed_successfully
+
+  ac-dashboard:
+    container_name: ac-dashboard
+    build:
+      context: ./dashboard
+    networks:
+      - ac-network
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:${DASHBOARD_EXTERNAL_PORT:-3000}:80
+    environment:
+      DASHBOARD_TITLE: AzerothCore Local Observer
+      DASHBOARD_EXTERNAL_PORT: ${DASHBOARD_EXTERNAL_PORT:-3000}
+      DASHBOARD_REFRESH_SECONDS: 15
+      DB_HOST: ac-database
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ${DOCKER_DB_ROOT_PASSWORD:-password}
+      AUTH_DB: acore_auth
+      CHARACTERS_DB: acore_characters
+      WORLD_DB: acore_world
+      PLAYERBOTS_DB: acore_playerbots
+      REALMLIST_HOST: 127.0.0.1
+      AUTH_PORT: ${DOCKER_AUTH_EXTERNAL_PORT:-3724}
+      WORLD_PORT: ${DOCKER_WORLD_EXTERNAL_PORT:-8085}
+      SOAP_PORT: ${DOCKER_SOAP_EXTERNAL_PORT:-7878}
+      CONFIGURED_BOTS_MIN: ${BOT_MIN:-1500}
+      CONFIGURED_BOTS_MAX: ${BOT_MAX:-1500}
+      CONFIGURED_LFG_BOTS: ${RANDOM_BOT_JOIN_LFG:-1}
+      CONFIGURED_BG_BOTS: ${RANDOM_BOT_JOIN_BG:-1}
+      CONFIGURED_BG_AUTOJOIN: ${RANDOM_BOT_AUTO_JOIN_BG:-1}
+      CONFIGURED_AOE_LOOT: ${AOE_LOOT_ENABLE:-1}
+      CONFIGURED_AOE_LOOT_RANGE: ${AOE_LOOT_RANGE:-55.0}
+      CONFIGURED_DUNGEON_RESPAWN: ${DUNGEON_RESPAWN_ENABLE:-1}
+      CONFIGURED_ALL_MOUNTS_NPC: ${ALL_MOUNTS_NPC_ENABLE_AI:-1}
+      CONFIGURED_MONEY_FOR_KILLS: ${MFK_ENABLE:-1}
+      CONFIGURED_MFK_PVP_LOOT: ${MFK_PVP_CORPSE_LOOT_PERCENT:-0}
+      CONFIGURED_AUTOBALANCE: ${AUTOBALANCE_ENABLE:-1}
+      CONFIGURED_AHBOT_SELLER: ${AHBOT_ENABLE_SELLER:-1}
+      CONFIGURED_AHBOT_BUYER: ${AHBOT_ENABLE_BUYER:-1}
+    depends_on:
+      ac-database:
+        condition: service_healthy
+
+  ac-client-data-init:
+    container_name: ac-client-data-init
+    image: acore/ac-wotlk-client-data:${DOCKER_IMAGE_TAG:-playerbot-local}
+    build:
+      context: ${ACORE_DIR:-./azerothcore-wotlk}
+      target: client-data
+      dockerfile: apps/docker/Dockerfile
+      args:
+        USER_ID: ${DOCKER_USER_ID:-1000}
+        GROUP_ID: ${DOCKER_GROUP_ID:-1000}
+        DOCKER_USER: ${DOCKER_USER:-acore}
+    volumes:
+      - ${DOCKER_VOL_DATA:-ac-client-data}:/azerothcore/env/dist/data
+
+  ac-tools:
+    container_name: ac-tools
+    image: acore/ac-wotlk-tools:${DOCKER_IMAGE_TAG:-playerbot-local}
+    build:
+      context: ${ACORE_DIR:-./azerothcore-wotlk}
+      target: tools
+      dockerfile: apps/docker/Dockerfile
+      args:
+        USER_ID: ${DOCKER_USER_ID:-1000}
+        GROUP_ID: ${DOCKER_GROUP_ID:-1000}
+        DOCKER_USER: ${DOCKER_USER:-acore}
+    working_dir: /azerothcore/env/client/
+    volumes:
+      - ${DOCKER_AC_CLIENT_FOLDER:-./var/client}:/azerothcore/env/dist/bin/Data
+    profiles:
+      - tools
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ac-ollama
+    networks:
+      - ac-network
+    ports:
+      - ${OLLAMA_EXTERNAL_PORT:-11434}:11434
+    volumes:
+      - ollama:/root/.ollama
+    profiles:
+      - llm
+
+volumes:
+  ac-database:
+  ac-client-data:
+  ollama:
+
+networks:
+  ac-network:
