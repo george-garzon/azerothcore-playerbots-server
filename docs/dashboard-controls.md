@@ -63,6 +63,26 @@ headroom. The tracked cap rises during the server session. It does not immediate
 relevel existing bots or continuously match party bots to your exact level;
 death knights retain their starting-level minimum.
 
+The local `BOT_LEVEL_MATCH_ENABLE=1` override replaces that weak cap with a
+range from level 1 through `min(80, BOT_LEVEL_MATCH_TARGET + 10)`.
+Bots already inside the range keep their levels and can earn XP normally.
+New random bots start at level 1.
+It adjusts eligible random bots and their gear in small batches when safe.
+Human-led parties, friend-listed bots, player-led guilds and arena teams are
+protected; busy bots can take longer. Death-knight logins are disabled when
+the upper bound is below 55 (changes to death-knight login eligibility take effect at the next world
+restart). `BOT_LEVEL_MATCH_GUID=1001` follows **Magic**. While the local
+controller is running and the realm is ready, it checks once every 24 hours,
+reads Magic's live level when online or saved level when offline, and updates
+the bracket when the level changes. Only the level is retained from the live
+character query. Config reloads do not restart the world. Bots adjust gradually
+when safe, so matching is not instantaneous. The operation history records
+range changes. The next check time is saved across controller restarts.
+Failures appear in monitoring errors and retry after five minutes.
+
+Set `BOT_LEVEL_MATCH_GUID=0` for a fixed source level instead (the +10 allowance still applies). When the controller is
+stopped, bots keep the last applied target. Human characters are never releveled.
+
 Dungeon AutoBalance explicitly enables dynamic creature-level, kill-XP and
 money scaling. Repeat clears can therefore remain useful for XP and gold as
 you level, with rewards adjusted for difficulty and party size. Item drops
@@ -74,6 +94,27 @@ Quest-required, independent creature drops have a database-level 2.5x chance
 boost, capped at 100%. Shared groups, reference loot and ordinary drops are
 unchanged. This is separate from XP controls; see [Quest drop boost](modules.md#quest-drop-boost)
 for scope and reapplication instructions.
+
+## Bot level controls
+
+The **Bot level range** section switches between Magic's daily 1-to-level+10
+range and a manual minimum/maximum (1–80, inclusive). Equal bounds select a
+single level. Manual mode pauses daily following. Unsaved edits survive polls.
+
+- **Apply range live:** saves the selected mode/range and reloads brackets.
+  Bots already inside the range keep their levels.
+- **Redistribute across range:** saves the range and divides it into up to eight
+  balanced bands. The core moves eligible bots from crowded bands to sparse
+  bands, choosing a random level inside the destination band. It does not
+  reroll every bot; gear and talents may be regenerated for bots that move.
+  Redistribution remains enabled until Apply range live or Save only clears it.
+- **Save only:** saves and generates config without sending a console command.
+  It takes effect on the next config reload (including daily sync) or startup.
+
+All actions preserve guild, friend-list, arena-team and human-party protections.
+Busy bots wait until safe. Live actions never restart the world and do not call
+the broad random-bot initialization command. Death-knight login eligibility
+still updates on a future world restart.
 
 ## Monitoring
 

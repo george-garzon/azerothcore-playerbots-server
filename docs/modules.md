@@ -16,6 +16,20 @@ human levels, with up to three levels of headroom and a cap that rises during
 the server session. Existing bots are not immediately releveled, and this is
 not exact ongoing party-level matching. Death knights retain their level floor.
 
+`BOT_LEVEL_MATCH_ENABLE=1` overrides that setting with the
+`BOT_LEVEL_MATCH_TARGET` source level: allowed bot levels are 1 through
+`min(80, source level + 10)`. `BOT_LEVEL_MATCH_GUID=1001` makes the local
+controller follow Magic's live level (saved level while offline), checking
+once every 24 hours (the schedule survives controller restarts). GUID 0 keeps
+a fixed source level. New random bots start at level 1 and can level normally;
+bots already inside the range stay unchanged. The bracket manager gradually adjusts eligible out-of-range
+bots and their equipment when safe. Guild, friend-list, arena-team and
+human-party protections remain enabled. Death-knight logins are disabled while
+the upper bound is below 55 (login eligibility updates at the next world restart).
+Level target changes reload configuration without restarting the world. Keep
+the local controller running for automatic following; otherwise the last
+target stays in effect. Party bots remain protected from automatic releveling.
+
 Install [MultiBot Chatless](https://github.com/Wishmaster117/MultiBot-Chatless)
 in the client's `Interface/AddOns` folder and enable it at character selection.
 Use its roster, bot connection and group controls to manage your bots, then its

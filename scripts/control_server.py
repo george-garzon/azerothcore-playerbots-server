@@ -27,6 +27,21 @@ LIMITS = {"XP_RATE_KILL": (0.1, 100), "XP_RATE_QUEST": (0.1, 100),
 DEFAULTS = dict(zip(LIMITS, [3, 3, 3, 5, 500, 500, 1, 20, 0, 1]))
 CACHE = {"sampled_at": None, "errors": ["Collecting first sample..."]}
 READY_BOOT = None
+BOT_LEVEL_SYNC = {"next_check": 0, "applied": None}
+BOT_LEVEL_DEFAULTS = {"BOT_LEVEL_MODE": "follow", "BOT_LEVEL_MIN": "1", "BOT_LEVEL_MAX": "24"}
+
+
+def validate_bot_levels(values):
+    if not isinstance(values, dict) or set(values) != set(BOT_LEVEL_DEFAULTS):
+        raise ValueError("Provide the level mode, minimum and maximum.")
+    if values["BOT_LEVEL_MODE"] not in ("follow", "manual"):
+        raise ValueError("Select daily following or a manual range.")
+    for key in ("BOT_LEVEL_MIN", "BOT_LEVEL_MAX"):
+        if not re.fullmatch(r"[0-9]{1,2}", str(values[key])) or not 1 <= int(values[key]) <= 80:
+            raise ValueError("Bot levels must be whole numbers between 1 and 80.")
+    if int(values["BOT_LEVEL_MIN"]) > int(values["BOT_LEVEL_MAX"]):
+        raise ValueError("Minimum bot level cannot exceed maximum.")
+    return {key: str(value) for key, value in values.items()}
 
 
 def run(args, timeout=60, input=None):
@@ -149,6 +164,24 @@ def ollama(path, payload=None, timeout=3):
 
 
 def perform(action, body):
+    if action in ("save_bot_levels", "apply_bot_levels", "spread_bot_levels"):
+        live = action != "save_bot_levels"
+        if live:
+            world = inspect_world()
+            if not world or not world["State"]["Running"]:
+                raise RuntimeError("World is stopped. Use Save for next start.")
+        settings = {**body["settings"], "BOT_LEVEL_MATCH_ENABLE": "1",
+                    "BOT_LEVEL_SPREAD": "1" if action == "spread_bot_levels" else "0"}
+        if settings["BOT_LEVEL_MODE"] == "follow" and env_values().get("BOT_LEVEL_MATCH_GUID", "0") == "0":
+            raise ValueError("Configure a human character GUID before enabling daily following.")
+        save_settings(settings)
+        ps_script("apply-config.ps1")
+        if live:
+            stage("Applying bot brackets; eligible bots adjust gradually when safe")
+            output = console("reload config")
+            if "Level management config reloaded." not in output:
+                raise RuntimeError("Settings saved, but live reload was not confirmed.")
+        return
     if action in ("start_all", "start_world"):
         stage("Checking Docker Desktop")
         ps_script("start-docker.ps1")
@@ -199,6 +232,7 @@ def perform(action, body):
 
 
 ACTIONS = {"start_all", "start_world", "stop_all", "stop_world", "save_settings", "apply_settings", "reload_chat", "probe"}
+ACTIONS.update({"save_bot_levels", "apply_bot_levels", "spread_bot_levels"})
 
 
 def submit(action, body):
@@ -211,6 +245,8 @@ def submit(action, body):
         body["countdown"] = seconds
     if action in ("save_settings", "apply_settings"):
         body["settings"] = validate_settings(body.get("settings"))
+    if action in ("save_bot_levels", "apply_bot_levels", "spread_bot_levels"):
+        body["settings"] = validate_bot_levels(body.get("settings"))
     with LOCK:
         if STATE["job"] and STATE["job"]["status"] == "running":
             raise RuntimeError("Another operation is running.")
@@ -319,11 +355,68 @@ def collect():
     return result
 
 
+def sync_bot_level(sample):
+    """Follow the explicitly selected human; retain the core's bot safety exclusions."""
+    values = env_values()
+    guid = values.get("BOT_LEVEL_MATCH_GUID", "0")
+    if (values.get("BOT_LEVEL_MATCH_ENABLE") != "1" or values.get("BOT_LEVEL_MODE", "follow") == "manual"
+            or guid == "0" or sample.get("realm") != "ready"):
+        return
+    if not guid.isdecimal() or int(guid) < 1:
+        raise ValueError("BOT_LEVEL_MATCH_GUID must identify a human character.")
+    schedule_path = ROOT / "var/control/bot-level-sync.json"
+    if BOT_LEVEL_SYNC["applied"] is None and schedule_path.exists():
+        try:
+            schedule = json.loads(schedule_path.read_text(encoding="utf-8"))
+            if schedule.get("guid") == guid and schedule.get("level") == values.get("BOT_LEVEL_MATCH_TARGET"):
+                BOT_LEVEL_SYNC["next_check"] = max(BOT_LEVEL_SYNC["next_check"], float(schedule["next_check"]))
+        except (ValueError, KeyError, TypeError):
+            pass  # A damaged schedule should not prevent the next check.
+    if time.time() < BOT_LEVEL_SYNC["next_check"]:
+        return
+    # Serialize config writes/reloads with dashboard operations, including shutdown.
+    with LOCK:
+        if STATE["job"] and STATE["job"]["status"] == "running":
+            return
+        BOT_LEVEL_SYNC["next_check"] = time.time() + 300  # Back off after a failed check.
+        row = sql("SELECT c.name,c.level,c.online FROM acore_characters.characters c "
+                  "LEFT JOIN acore_playerbots.playerbots_account_type t ON t.account_id=c.account "
+                  f"WHERE c.guid={int(guid)} AND COALESCE(t.account_type,0)=0;").split("\t")
+        if len(row) != 3 or not re.fullmatch(r"[A-Za-z]{2,12}", row[0]):
+            raise ValueError("Bot level source is missing or is not an eligible human character.")
+        name, saved_level, online = row
+        level = console(f"pinfo {name}").strip() if online == "1" else saved_level
+        if not level.isdecimal() or not 1 <= int(level) <= 80:
+            raise ValueError("Invalid human character level; bot configuration was not changed.")
+        marker = (guid, level, READY_BOOT)
+        changed = BOT_LEVEL_SYNC["applied"] != marker or values.get("BOT_LEVEL_MATCH_TARGET") != level
+        if changed:
+            save_settings({"BOT_LEVEL_MATCH_TARGET": level})
+            ps_script("apply-config.ps1")
+            # This reloads bracket bounds without rebuilding Playerbots' accounts/caches.
+            output = console("reload config")
+            if "Level management config reloaded." not in output:
+                raise RuntimeError("Bot level reload was not confirmed; will retry in five minutes.")
+        BOT_LEVEL_SYNC["applied"] = marker
+        BOT_LEVEL_SYNC["next_check"] = time.time() + 86400
+        schedule_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = schedule_path.with_suffix(".tmp")
+        temporary.write_text(json.dumps({"guid": guid, "level": level,
+                                        "next_check": BOT_LEVEL_SYNC["next_check"]}), encoding="utf-8")
+        os.replace(temporary, schedule_path)
+    if changed:
+        event(f"Random bot range now follows {name}: levels 1–{min(80, int(level) + 10)}; next check in 24 hours (protected bots excluded).")
+
+
 def monitor():
     global CACHE
     while True:
         try:
             CACHE = collect()
+            try:
+                sync_bot_level(CACHE)
+            except Exception as exc:
+                CACHE.setdefault("errors", []).append(f"Bot level sync: {exc}")
         except Exception as exc:
             CACHE = {"sampled_at": time.time(), "errors": [str(exc)]}
         time.sleep(5)
@@ -360,6 +453,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             values = env_values()
             with LOCK:
                 data = {**CACHE, **STATE, "settings": {key: values.get(key, default) for key, default in DEFAULTS.items()}}
+                data["bot_levels"] = {key: values.get(key, default) for key, default in BOT_LEVEL_DEFAULTS.items()}
+                data["bot_level_source"] = values.get("BOT_LEVEL_MATCH_TARGET", "13")
             return self.send(200, data)
         if self.path.startswith("/api/logs/"):
             try:

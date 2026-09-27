@@ -57,6 +57,25 @@ function Get-Setting {
 $ModuleConfigPath = Join-Path $CorePath "env/dist/etc/modules"
 New-Item -ItemType Directory -Path $ModuleConfigPath -Force | Out-Null
 
+$MatchBotLevel = (Get-Setting "BOT_LEVEL_MATCH_ENABLE" "0") -eq "1"
+$BotTargetLevel = [int](Get-Setting "BOT_LEVEL_MATCH_TARGET" "13")
+if ($MatchBotLevel -and ($BotTargetLevel -lt 1 -or $BotTargetLevel -gt 80)) {
+    throw "BOT_LEVEL_MATCH_TARGET must be between 1 and 80."
+}
+$BotLevelCeiling = [Math]::Min(80, $BotTargetLevel + 10)
+$BotLevelFloor = 1
+if ((Get-Setting "BOT_LEVEL_MODE" "follow") -eq "manual") {
+    $BotLevelFloor = [int](Get-Setting "BOT_LEVEL_MIN" "1")
+    $BotLevelCeiling = [int](Get-Setting "BOT_LEVEL_MAX" "24")
+}
+if ($BotLevelFloor -lt 1 -or $BotLevelCeiling -gt 80 -or $BotLevelFloor -gt $BotLevelCeiling) {
+    throw "Bot level range must be ordered and between 1 and 80."
+}
+$BotRangeCount = 1
+if ((Get-Setting "BOT_LEVEL_SPREAD" "0") -eq "1") {
+    $BotRangeCount = [Math]::Min(8, $BotLevelCeiling - $BotLevelFloor + 1)
+}
+
 $playerbotsConfig = @"
 [worldserver]
 AiPlayerbot.Enabled = 1
@@ -89,6 +108,38 @@ AiPlayerbot.RandomBotAutoJoinBGAVCount = $(Get-Setting -Name "RANDOM_BOT_BG_AV_C
 AiPlayerbot.RandomBotAutoJoinBGEYCount = $(Get-Setting -Name "RANDOM_BOT_BG_EY_COUNT" -Fallback "1")
 AiPlayerbot.RandomBotAutoJoinBGICCount = $(Get-Setting -Name "RANDOM_BOT_BG_IC_COUNT" -Fallback "0")
 "@
+
+if ($MatchBotLevel) {
+    # Only eligible random bots: preserve guild, friend, arena and human-party protections.
+    $playerbotsConfig = $playerbotsConfig -replace 'AiPlayerbot.SyncLevelWithPlayers = \d+', 'AiPlayerbot.SyncLevelWithPlayers = 0'
+    $playerbotsConfig += @"
+
+AiPlayerbot.DisableRandomLevels = 1
+AiPlayerbot.RandombotStartingLevel = 1
+AiPlayerbot.RandomBotFixedLevel = 0
+AiPlayerbot.DisableDeathKnightLogin = $(if ($BotLevelCeiling -lt 55) { 1 } else { 0 })
+AiPlayerbot.LevelBrackets.Enabled = 1
+AiPlayerbot.LevelBrackets.NumRanges = $BotRangeCount
+AiPlayerbot.LevelBrackets.CheckFrequency = 15
+AiPlayerbot.LevelBrackets.CheckFlaggedFrequency = 2
+AiPlayerbot.LevelBrackets.FlaggedProcessLimit = 5
+AiPlayerbot.LevelBrackets.Dynamic.UseDynamicDistribution = 0
+AiPlayerbot.LevelBrackets.IgnoreGuildBotsWithRealPlayers = 1
+AiPlayerbot.LevelBrackets.IgnoreFriendListed = 1
+AiPlayerbot.LevelBrackets.IgnoreArenaTeamBots = 1
+"@
+    for ($rangeIndex = 0; $rangeIndex -lt $BotRangeCount; $rangeIndex++) {
+        $width = $BotLevelCeiling - $BotLevelFloor + 1
+        $lower = $BotLevelFloor + [int][Math]::Floor($rangeIndex * $width / $BotRangeCount)
+        $upper = $BotLevelFloor + [int][Math]::Floor(($rangeIndex + 1) * $width / $BotRangeCount) - 1
+        $percent = [int][Math]::Floor(100 / $BotRangeCount)
+        if ($rangeIndex -lt (100 % $BotRangeCount)) { $percent++ }
+        foreach ($faction in @("Alliance", "Horde")) {
+            $prefix = "AiPlayerbot.LevelBrackets.$faction.Range$($rangeIndex + 1)"
+            $playerbotsConfig += "`n$prefix.Lower = $lower`n$prefix.Upper = $upper`n$prefix.Pct = $percent`n"
+        }
+    }
+}
 
 $ahbotConfig = @"
 [worldserver]

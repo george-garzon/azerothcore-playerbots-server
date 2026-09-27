@@ -32,6 +32,17 @@
 </div><div class="buttons"><button type="submit" value="save_settings">Save for next start</button><button type="submit" value="apply_settings">Save + restart world</button><button type="button" data-action="reload_chat">Reload saved chat settings</button><button type="button" data-action="probe">Test Ollama reply</button></div>
 <p class="muted">Saving writes .env and generated configuration. XP/bot changes need a world restart. Chat reload applies saved settings without disconnecting players.</p>
 </form></section>
+<section><h2>Bot level range</h2><form id="bot-levels">
+<div class="fields">
+<label>Level mode<select name="BOT_LEVEL_MODE"><option value="follow">Follow Magic daily (+10 levels)</option><option value="manual">Manual range</option></select></label>
+<label>Minimum level<input name="BOT_LEVEL_MIN" type="number" min="1" max="80" step="1" required></label>
+<label>Maximum level<input name="BOT_LEVEL_MAX" type="number" min="1" max="80" step="1" required></label>
+</div>
+<p id="bot-level-summary" class="muted"></p>
+<div class="buttons"><button type="submit" value="apply_bot_levels">Apply range live</button><button type="submit" value="spread_bot_levels">Redistribute across range</button><button type="submit" value="save_bot_levels">Save only</button></div>
+<p class="muted">Apply range leaves bots already inside it unchanged. Redistribute spreads eligible bots across level bands, randomly choosing levels within each band; it may rebuild their gear and talents. It does not reroll every bot. Changes happen gradually when safe. Party, guild, friend-list and arena-team protections remain.</p>
+<p class="muted">Live actions do not restart the game. Save only takes effect on a later configuration reload or world start. Death-knight login eligibility changes require a future world restart.</p>
+</form></section>
 <section><div class="section-head"><h2>Live logs</h2><select id="log-source" aria-label="Log source"><option>ac-worldserver</option><option>ac-authserver</option><option>ac-database</option><option value="ollama">Native Ollama</option></select><label><input id="pause-logs" type="checkbox"> Pause</label></div>
 <p class="muted">Latest 100 lines; updates every 5 seconds. Pause to inspect without scrolling.</p><pre id="logs" tabindex="0">Loading…</pre></section>
 <section><h2>Errors and operation history</h2><pre id="errors">Collecting status…</pre><div id="events"></div><p id="updated" class="muted"></p></section>

@@ -9,8 +9,19 @@ import time
 import msvcrt
 
 
+def extract_player_level(output):
+    # pinfo also includes private account details: return only its character-level line.
+    clean = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", output)
+    levels = re.findall(r"\| Level: (\d+)\b", clean)
+    if len(levels) != 1 or not 1 <= int(levels[0]) <= 80:
+        raise RuntimeError("Could not read the character's live level.")
+    return levels[0]
+
+
 def send(command):
-    if command not in ("server info", "ollama reload", "reload creature_loot_template") and not re.fullmatch(
+    player_info = re.fullmatch(r"pinfo [A-Za-z]{2,12}", command)
+    if command not in ("server info", "ollama reload", "reload creature_loot_template",
+                       "reload config", "playerbots rndbot reload") and not player_info and not re.fullmatch(
             r"announce Server shutdown in \d+ seconds\. Please finish safely\.", command):
         raise ValueError("Unsupported console command")
     endpoint = subprocess.check_output(["docker", "context", "inspect", "--format",
@@ -52,7 +63,8 @@ def send(command):
                 output += pipe.read(available.value)
             else:
                 time.sleep(0.05)
-        print(output.decode("utf-8", "replace"))
+        decoded = output.decode("utf-8", "replace")
+        print(extract_player_level(decoded) if player_info else decoded)
 
 
 if __name__ == "__main__":

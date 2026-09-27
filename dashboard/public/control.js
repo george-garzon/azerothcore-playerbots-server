@@ -22,14 +22,35 @@ $('settings').onsubmit = event => {
   event.preventDefault();
   if ($('settings').reportValidity()) act(event.submitter.value, Object.fromEntries(new FormData($('settings'))));
 };
+let sourceLevel = 13;
+function showBotRange() {
+  const form = $('bot-levels');
+  const follow = form.elements.BOT_LEVEL_MODE.value === 'follow';
+  const low = form.elements.BOT_LEVEL_MIN;
+  const high = form.elements.BOT_LEVEL_MAX;
+  low.readOnly = high.readOnly = follow;
+  high.setCustomValidity(!follow && Number(low.value) > Number(high.value) ? 'Maximum must be at least the minimum.' : '');
+  $('bot-level-summary').textContent = follow
+    ? `Daily range: 1–${Math.min(80, sourceLevel + 10)}. Last checked Magic level: ${sourceLevel}. Manual fields are unused in this mode.`
+    : `Manual range: ${low.value}–${high.value}. Daily following is paused while manual mode is saved.`;
+}
+$('bot-levels').oninput = showBotRange;
+$('bot-levels').onsubmit = event => {
+  event.preventDefault();
+  showBotRange();
+  if ($('bot-levels').reportValidity()) act(event.submitter.value, Object.fromEntries(new FormData($('bot-levels'))));
+};
 async function refresh() {
   try {
     const data = await api('status');
     if (!token) token = (await api('session')).token;
     if (!initialized) {
       for (const [key,value] of Object.entries(data.settings)) $('settings').elements.namedItem(key).value = value;
+      for (const [key,value] of Object.entries(data.bot_levels || {})) $('bot-levels').elements.namedItem(key).value = value;
       initialized = true;
     }
+    sourceLevel = Number(data.bot_level_source || 13);
+    showBotRange();
     $('realm').textContent = data.realm || 'Unknown';
     $('address').textContent = data.realm_address || 'Database unavailable';
     $('population').textContent = data.online == null ? 'Unknown' : `${data.online} online · ${data.bots} bots`;
