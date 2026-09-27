@@ -11,6 +11,10 @@ Commands below are typed in game unless explicitly marked as PowerShell or SQL.
 random-bot target; defaults are 500. `RANDOM_BOT_MIN_LEVEL` and
 `RANDOM_BOT_MAX_LEVEL` control the configured level range. `MAX_ADDED_BOTS`
 limits controllable party bots. Lower the population if the host struggles.
+`SYNC_LEVEL_WITH_PLAYERS=1` limits newly randomized bots using observed non-GM
+human levels, with up to three levels of headroom and a cap that rises during
+the server session. Existing bots are not immediately releveled, and this is
+not exact ongoing party-level matching. Death knights retain their level floor.
 
 Install [MultiBot Chatless](https://github.com/Wishmaster117/MultiBot-Chatless)
 in the client's `Interface/AddOns` folder and enable it at character selection.
@@ -28,6 +32,28 @@ the complete command syntax and supported dungeon/raid strategies.
 control dungeon-finder and battleground participation. Join through the normal
 client interfaces. The `RANDOM_BOT_BG_*` settings control enabled brackets and
 counts; bots still need suitable levels and eligible queues.
+
+## Quest drop boost
+
+Independent quest-required creature drops use **2.5x** their original chance,
+capped at 100% (10% becomes 25%; 20% becomes 50%; 40% becomes 100%).
+Only `QuestRequired=1`, non-reference, ungrouped creature loot rows are changed.
+Ordinary items, shared loot groups, reference tables, containers and guaranteed
+drops retain their original behavior. Items usable for quests but also dropped
+as ordinary trade goods are not boosted. Quest eligibility and item counts are
+unchanged; existing corpses with generated loot are not rerolled.
+
+Apply once to a new database, or reapply after content updates:
+
+```powershell
+py -3 scripts/apply-quest-drop-boost.py
+py -3 scripts/control_console.py "reload creature_loot_template"
+```
+
+The database retains originals in `custom_quest_drop_baseline`; reapplication
+does not compound the multiplier. Rows changed to a different chance by later
+content updates are preserved for manual review. Keep the baseline table in
+database backups. This override persists across normal server restarts.
 
 ## Dungeon Clear
 
@@ -57,6 +83,10 @@ to inspect scaling or target a creature and use `.ab creaturestat`.
 variants set minimum scaling counts. Bots can affect the effective party size;
 inspect the reported values before adjusting difficulty. GM `.ab setoffset`
 changes the server-wide difficulty offset; `.ab getoffset` displays it.
+Dynamic creature-level, XP and money scaling are explicitly enabled in generated
+configuration. Repeat clears retain scaled combat rewards, subject to party
+size and difficulty; item drops do not gain higher item levels. Quest rewards,
+Dungeon Finder first/repeat rewards and lockouts retain their normal rules.
 
 ## DungeonRespawn
 

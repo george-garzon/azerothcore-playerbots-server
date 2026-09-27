@@ -21,10 +21,10 @@ TOKEN = secrets.token_urlsafe(32)
 LOCK = threading.Lock()
 STATE = {"job": None, "events": [], "probe": None}
 LIMITS = {"XP_RATE_KILL": (0.1, 100), "XP_RATE_QUEST": (0.1, 100),
-          "XP_RATE_QUEST_DF": (0.1, 100), "BOT_MIN": (0, 5000), "BOT_MAX": (0, 5000),
+          "XP_RATE_QUEST_DF": (0.1, 100), "XP_RATE_BG": (0.1, 100), "BOT_MIN": (0, 5000), "BOT_MAX": (0, 5000),
           "OLLAMA_CHAT_ENABLE": (0, 1), "OLLAMA_CHAT_RATE_LIMIT_GLOBAL_PER_MINUTE": (1, 120),
           "OLLAMA_CHAT_DISABLE_IN_COMBAT": (0, 1), "OLLAMA_CHAT_RANDOM_CHATTER": (0, 1)}
-DEFAULTS = dict(zip(LIMITS, [3, 3, 3, 500, 500, 1, 20, 0, 1]))
+DEFAULTS = dict(zip(LIMITS, [3, 3, 3, 5, 500, 500, 1, 20, 0, 1]))
 CACHE = {"sampled_at": None, "errors": ["Collecting first sample..."]}
 READY_BOOT = None
 

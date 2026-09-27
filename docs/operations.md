@@ -49,12 +49,14 @@ The project `.env` contains:
 XP_RATE_KILL=3
 XP_RATE_QUEST=3
 XP_RATE_QUEST_DF=3
+XP_RATE_BG=5
 ```
 
 These map to AzerothCore's `Rate.XP.Kill`, `Rate.XP.Quest`, and
 `Rate.XP.Quest.DF`. Dungeon Finder quest rewards have a separate rate, not an
-additional multiplier on top of ordinary quest XP. Exploration, pet XP and
-battleground-specific XP remain at their existing settings. Normal level,
+additional multiplier on top of ordinary quest XP. `XP_RATE_BG` sets all six
+battleground kill rates and the objective bonus rate to 5x; kill XP is enabled.
+Exploration and pet XP remain at their existing settings. Normal level,
 eligibility, group and progression rules still apply.
 
 Apply edits on a running stack with:

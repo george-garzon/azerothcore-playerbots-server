@@ -10,7 +10,7 @@ import msvcrt
 
 
 def send(command):
-    if command not in ("server info", "ollama reload") and not re.fullmatch(
+    if command not in ("server info", "ollama reload", "reload creature_loot_template") and not re.fullmatch(
             r"announce Server shutdown in \d+ seconds\. Please finish safely\.", command):
         raise ValueError("Unsupported console command")
     endpoint = subprocess.check_output(["docker", "context", "inspect", "--format",

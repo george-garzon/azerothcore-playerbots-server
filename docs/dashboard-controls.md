@@ -46,13 +46,34 @@ available for inspection; retry after fixing the reported error.
 | Reload saved chat settings | Regenerate configuration and send `ollama reload` through the local console. |
 | Test Ollama reply | Generate one short reply and record its response time. Does not post it in game. |
 
-XP controls include kill, quest and Dungeon Finder quest rates. Bot minimum
+XP controls include kill, quest and Dungeon Finder quest rates (3x), plus
+battleground kill and objective XP (5x). Battleground kill XP is enabled.
+The battleground multiplier is independent of the ordinary kill rate.
+Bot minimum
 cannot exceed maximum. Changing bot targets does not instantly create or delete
 all bot characters; the bot manager converges to its configured population.
 Chat controls include enable/disable, ambient chatter, combat replies and the
 global messages-per-minute cap. Unsaved form edits are never overwritten by
 monitoring polls. Reload applies saved settings; XP and bot environment values
 require container recreation through Save + restart or the next start.
+
+`SYNC_LEVEL_WITH_PLAYERS=1` enables Playerbots' level limit for newly randomized
+random bots, based on observed non-GM human levels with up to a three-level
+headroom. The tracked cap rises during the server session. It does not immediately
+relevel existing bots or continuously match party bots to your exact level;
+death knights retain their starting-level minimum.
+
+Dungeon AutoBalance explicitly enables dynamic creature-level, kill-XP and
+money scaling. Repeat clears can therefore remain useful for XP and gold as
+you level, with rewards adjusted for difficulty and party size. Item drops
+retain their original item levels; ordinary quest completion rules, Dungeon
+Finder first/repeat reward differences and instance lockouts still apply.
+Check `.ab mapstat` and `.ab creaturestat` in game to inspect current scaling.
+
+Quest-required, independent creature drops have a database-level 2.5x chance
+boost, capped at 100%. Shared groups, reference loot and ordinary drops are
+unchanged. This is separate from XP controls; see [Quest drop boost](modules.md#quest-drop-boost)
+for scope and reapplication instructions.
 
 ## Monitoring
 
